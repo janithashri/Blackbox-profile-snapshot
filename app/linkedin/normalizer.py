@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 from app.linkedin.capture import extract_rsc_body
+from app.linkedin.names import sanitize_full_name
 from app.schemas.profile import (
     CertificationItem,
     EducationItem,
@@ -963,8 +964,11 @@ def normalize_sdui_profile(raw: str, *, section: str | None = None) -> ProfileSn
             if "|" in label or "LinkedIn" in label:
                 continue
             if 2 < len(label) < 80 and not label.startswith("$"):
-                full_name = label.strip()
-                break
+                full_name = sanitize_full_name(label.strip())
+                if full_name:
+                    break
+
+    full_name = sanitize_full_name(full_name)
 
     aco = _PROFILE_ID.findall(blob)
     if not aco:

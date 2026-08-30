@@ -11,6 +11,7 @@ from typing import Any
 from app.config import settings
 from app.linkedin.client import fetch_live_profile
 from app.linkedin.errors import ClassifiedResponse, ResponseClass
+from app.linkedin.names import sanitize_full_name
 from app.linkedin.public_id import PublicIdError, parse_linkedin_public_id
 from app.schemas.profile import ProfileSnapshot
 from app.services.cache import cache_get, cache_set
@@ -81,6 +82,7 @@ def compute_missing_fields(data: dict[str, Any]) -> list[str]:
 
 def snapshot_to_result(snapshot: ProfileSnapshot) -> dict[str, Any]:
     data = snapshot.model_dump(mode="json")
+    data["full_name"] = sanitize_full_name(data.get("full_name"))
     data["missing_fields"] = compute_missing_fields(data)
     data["fetched_at"] = datetime.now(timezone.utc).isoformat()
     return data

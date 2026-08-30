@@ -71,6 +71,21 @@ class NormalizeCaptureTests(unittest.TestCase):
         self.assertEqual(len(snap.experience), 1)
         self.assertIn("Jan 2020 - Present", snap.experience[0].date_range or "")
 
+    def test_sanitize_strips_follow_invite_connect_chrome(self):
+        from app.linkedin.merge import dedupe_snapshot
+        from app.linkedin.names import sanitize_full_name
+
+        self.assertEqual(sanitize_full_name("Ada Lovelace Follow"), "Ada Lovelace")
+        self.assertEqual(sanitize_full_name("Follow Ada Lovelace"), "Ada Lovelace")
+        self.assertEqual(
+            sanitize_full_name("Invite Ada Lovelace to connect"), "Ada Lovelace"
+        )
+        self.assertEqual(sanitize_full_name("Ada Lovelace | LinkedIn"), "Ada Lovelace")
+        cleaned = dedupe_snapshot(
+            ProfileSnapshot(full_name="Connect Ada Lovelace Message")
+        )
+        self.assertEqual(cleaned.full_name, "Ada Lovelace")
+
     def test_experience_html_extracts_title_and_company(self):
         snap = normalize_sdui_profile(EXPERIENCE_HTML)
         self.assertEqual(len(snap.experience), 1)

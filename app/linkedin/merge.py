@@ -2,6 +2,7 @@
 
 import re
 
+from app.linkedin.names import sanitize_full_name
 from app.schemas.profile import ProfileSnapshot
 
 _SKIP_MERGE = {"source"}
@@ -164,4 +165,5 @@ def dedupe_snapshot(snapshot: ProfileSnapshot) -> ProfileSnapshot:
         languages.append(item)
     data["languages"] = languages
 
+    data["full_name"] = sanitize_full_name(data.get("full_name"))
     return ProfileSnapshot.model_validate(data)
