@@ -303,7 +303,7 @@
       <p class="missing-note" id="missing-note" hidden></p>
 
       <div class="profile-header">
-        <img id="photo-img" alt="Profile photo" hidden>
+        <img id="photo-img" alt="Profile photo" referrerpolicy="no-referrer" hidden>
         <div class="photo-placeholder" id="photo-placeholder">No photo</div>
         <div class="profile-meta">
           <h2 class="profile-name" id="profile-name"></h2>
@@ -428,16 +428,16 @@
     }
 
     function renderPhoto(url) {
-      const complete = url && /^https?:\/\//.test(url)
-        && /(?:shrink|scale)_\d+_\d+/.test(url);
-      if (complete) {
-        photoPlaceholder.hidden = true;
-        photoImg.hidden = false;
-        photoImg.onerror = showPhotoPlaceholder;
-        photoImg.src = url;
-      } else {
+      const text = textOrEmpty(url);
+      const ok = /^https:\/\/media(?:-exp)?\.licdn\.com\/dms\//.test(text);
+      if (!ok) {
         showPhotoPlaceholder();
+        return;
       }
+      photoPlaceholder.hidden = true;
+      photoImg.hidden = false;
+      photoImg.onerror = showPhotoPlaceholder;
+      photoImg.src = "/media/photo?url=" + encodeURIComponent(text);
     }
 
     function renderAbout(about) {

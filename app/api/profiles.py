@@ -1,9 +1,12 @@
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+import httpx
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
+from fastapi.responses import Response
 
 from app.config import settings
 from app.linkedin.errors import ResponseClass
+from app.linkedin.photo import fetch_linkedin_photo, is_linkedin_photo_url
 from app.linkedin.public_id import PublicIdError
 from app.linkedin.merge import merge_snapshots
 from app.linkedin.normalizer import normalize_sdui_file, normalize_sdui_profile
@@ -48,6 +51,25 @@ def _from_captures(public_id: str) -> ProfileSnapshot | None:
         merged = merge_snapshots(snapshots[0], *snapshots[1:])
     merged.notes = list(merged.notes) + [f"from_capture:{path.name}" for path in files]
     return merged
+
+
+@router.get("/media/photo")
+async def proxy_profile_photo(url: str = Query(..., min_length=8, max_length=2000)):
+    if not is_linkedin_photo_url(url):
+        raise HTTPException(status_code=400, detail={"code": "invalid_photo_url"})
+    try:
+        body, content_type = await fetch_linkedin_photo(url)
+    except ValueError:
+        raise HTTPException(status_code=400, detail={"code": "invalid_photo_url"})
+    except httpx.HTTPStatusError:
+        raise HTTPException(status_code=502, detail={"code": "photo_fetch_failed"})
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail={"code": "photo_fetch_failed"})
+    return Response(
+        content=body,
+        media_type=content_type,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
 
 
 @router.post("/profiles")

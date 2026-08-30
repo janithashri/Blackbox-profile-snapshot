@@ -207,7 +207,40 @@ class JobApiTests(unittest.TestCase):
         self.assertIn("Experience (", response.text)
         self.assertIn("id=\"sec-experience\" open", response.text)
         self.assertIn("id=\"sec-skills\"", response.text)
+        self.assertIn("/media/photo?url=", response.text)
         self.assertNotIn("id=\"sec-skills\" open", response.text)
+
+
+class PhotoProxyTests(unittest.TestCase):
+    def test_rejects_non_linkedin_host(self):
+        client = TestClient(app)
+        response = client.get(
+            "/media/photo",
+            params={"url": "https://example.com/evil.jpg"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_proxies_media_licdn_bytes(self):
+        jpeg = b"\xff\xd8\xff" + b"fake"
+
+        async def fake_fetch(url: str):
+            self.assertIn("media.licdn.com/dms/", url)
+            return jpeg, "image/jpeg"
+
+        with patch("app.api.profiles.fetch_linkedin_photo", new=fake_fetch):
+            client = TestClient(app)
+            response = client.get(
+                "/media/photo",
+                params={
+                    "url": (
+                        "https://media.licdn.com/dms/image/v2/x/"
+                        "profile-displayphoto-shrink_100_100/a/0/1?e=9"
+                    )
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, jpeg)
+        self.assertEqual(response.headers["content-type"], "image/jpeg")
 
 
 if __name__ == "__main__":
