@@ -14,57 +14,7 @@ request in this project is a direct HTTP call.
 
 ## Architecture
 
-```
-                         ┌─────────────────────┐
-                         │   Browser / Client    │
-                         └──────────┬────────────┘
-                                    │ HTTP / HTTPS
-                                    ▼
-                         ┌─────────────────────┐
-                         │      FastAPI            │
-                         │  GET  /                  │
-                         │  GET  /health             │
-                         │  POST /profiles            │
-                         │  GET  /jobs/{job_id}        │
-                         │  GET  /profiles/{public_id}  │
-                         │  POST /profiles/normalize      │
-                         └──────────┬──────────────────┘
-                                    │
-                   cache hit        │        cache miss / no in-flight job
-              ┌─────────────────────┤
-              ▼                     ▼
-   ┌───────────────────┐  ┌──────────────────────────┐
-   │  In-memory result    │  │  In-memory job store       │
-   │  cache (public_id →   │  │  (job_id → status/result)   │
-   │  ProfileSnapshot,      │  └──────────────┬──────────────┘
-   │  TTL-based)             │                 │
-   └───────────────────┘  ┌────────────────▼─────────────────┐
-                          │   BackgroundTasks: run_scrape_job     │
-                          └────────────────┬─────────────────────┘
-                                           │
-                          ┌────────────────▼─────────────────────┐
-                          │        Two-Account Fallback              │
-                          │  1. try PRIMARY li_at/JSESSIONID           │
-                          │  2. on session_rejected, try SECONDARY      │
-                          │     (if configured), one retry                │
-                          └────────────────┬─────────────────────────────┘
-                                           │
-                          ┌────────────────▼─────────────────────────────┐
-                          │           fetch_live_profile                    │
-                          │   (throttled, sequential — see below)            │
-                          └────────────────┬─────────────────────────────────┘
-                                           │
-                          ┌────────────────▼─────────────────────────────────┐
-                          │   Response Classifier (errors.py)                    │
-                          │   999 / login-redirect / thin-challenge → session_death│
-                          │   real payload markers → treated as success            │
-                          └────────────────┬─────────────────────────────────────┘
-                                           │
-                          ┌────────────────▼─────────────────────────────────────┐
-                          │   Normalize + Merge + Dedupe                             │
-                          │   RSC chunks / HTML __como_rehydration__ → ProfileSnapshot│
-                          └───────────────────────────────────────────────────────┘
-```
+![Architecture](architecture.png)
 
 No Celery, no Redis, no message broker, no multi-account pool with
 health-scored selection. Two accounts with a one-shot fallback and a
