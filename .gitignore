@@ -1,0 +1,12 @@
+.env
+.cookie_header
+__pycache__/
+*.pyc
+.venv
+data/
+data/debug/
+tests/fixtures/manual_capture_*
+tests/fixtures/_extract_preview.txt
+.cursor/
+.DS_Store
+*.egg-info/

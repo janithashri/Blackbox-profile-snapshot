@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LinkedIn Profile Scraper</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --orange: #ff6b35;
+      --orange-dark: #e85a28;
+      --text: #2d2d2d;
+      --muted: #6b6b6b;
+      --ok: #2e7d32;
+      --fail: #c62828;
+      --panel: #f4f4f4;
+      --disabled: #c8c8c8;
+      --amber: #b26a00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    .wrap {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 32px;
+      background: var(--bg);
+      border-radius: 8px;
+      box-shadow: 0 8px 28px rgba(45, 45, 45, 0.08);
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 1.45rem;
+      font-weight: 650;
+      color: var(--orange);
+    }
+    .sub {
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    label { display: block; }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font: inherit;
+      color: var(--text);
+      outline: none;
+    }
+    input[type="text"]:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.18);
+    }
+    button.primary {
+      margin-top: 14px;
+      width: 100%;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--orange);
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.primary:hover:not(:disabled) { background: var(--orange-dark); }
+    button.primary:disabled {
+      background: var(--disabled);
+      color: #fff;
+      cursor: not-allowed;
+    }
+    .status {
+      min-height: 1.6em;
+      margin: 14px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+    }
+    .status.ok { color: var(--ok); }
+    .status.fail { color: var(--fail); }
+    .status.busy { color: var(--text); }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 107, 53, 0.25);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #result-section { margin-top: 28px; }
+    .missing-note {
+      margin: 0 0 16px;
+      padding: 8px 10px;
+      background: #fff8ee;
+      color: var(--amber);
+      border-radius: 8px;
+      font-size: 0.82rem;
+    }
+    .profile-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .profile-header img,
+    .photo-placeholder {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .profile-header img {
+      object-fit: cover;
+      border: 1px solid #ddd;
+      background: #fff;
+    }
+    .photo-placeholder {
+      background: #e8e8e8;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8px;
+      font-size: 0.7rem;
+    }
+    .profile-header img[hidden],
+    .photo-placeholder[hidden] {
+      display: none !important;
+    }
+    .profile-meta { min-width: 0; }
+    .profile-name {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 650;
+      color: var(--text);
+    }
+    .profile-headline {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .profile-location {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .about-label {
+      margin: 0 0 8px;
+      color: var(--orange);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .about-body p {
+      margin: 0 0 12px;
+      white-space: pre-wrap;
+    }
+    .about-body p:last-child { margin-bottom: 0; }
+    .about-empty {
+      margin: 0;
+      color: var(--muted);
+      font-style: italic;
+      font-size: 0.9rem;
+    }
+    details.section {
+      margin-top: 12px;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+    details.section > summary {
+      list-style: none;
+      cursor: pointer;
+      color: var(--orange);
+      font-weight: 650;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    details.section > summary::-webkit-details-marker { display: none; }
+    details.section > summary::before {
+      content: "▸";
+      display: inline-block;
+      transition: transform 0.15s ease;
+      font-size: 0.8rem;
+    }
+    details.section[open] > summary::before { transform: rotate(90deg); }
+    .section-body { margin: 10px 0 4px; }
+    .entry {
+      padding: 10px 12px;
+      background: var(--panel);
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .entry:last-child { margin-bottom: 0; }
+    .entry-title {
+      margin: 0;
+      font-weight: 650;
+      color: var(--text);
+    }
+    .entry-sub { margin: 2px 0 0; }
+    .entry-meta {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      border: 1px solid var(--orange);
+      background: #fff;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.82rem;
+    }
+    .lang-row { margin: 0 0 6px; }
+    .empty-list {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+    .raw-debug { margin-top: 20px; }
+    .raw-debug > summary {
+      list-style: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .raw-debug > summary::-webkit-details-marker { display: none; }
+    .raw-head {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+    .raw-head button.copy {
+      border: 1px solid var(--orange);
+      background: #fff;
+      color: var(--orange);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .raw-head button.copy:hover { background: rgba(255, 107, 53, 0.08); }
+    pre {
+      margin: 12px 0 0;
+      padding: 16px;
+      background: var(--panel);
+      border-radius: 8px;
+      overflow: auto;
+      max-height: 480px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>LinkedIn Profile Scraper</h1>
+    <p class="sub">Tross take home challenge</p>
+
+    <form id="form">
+      <label>
+        <input
+          id="query"
+          type="text"
+          name="linkedin_url_or_id"
+          placeholder="LinkedIn profile URL or public ID (e.g. jane-doe)"
+          autocomplete="off"
+        >
+      </label>
+      <button class="primary" id="submit" type="submit">Fetch details</button>
+    </form>
+
+    <div class="status" id="status" aria-live="polite"></div>
+
+    <section id="result-section" hidden>
+      <p class="missing-note" id="missing-note" hidden></p>
+
+      <div class="profile-header">
+        <img id="photo-img" alt="Profile photo" hidden>
+        <div class="photo-placeholder" id="photo-placeholder">No photo</div>
+        <div class="profile-meta">
+          <h2 class="profile-name" id="profile-name"></h2>
+          <p class="profile-headline" id="profile-headline" hidden></p>
+          <p class="profile-location" id="profile-location" hidden></p>
+        </div>
+      </div>
+
+      <div class="about-block">
+        <div class="about-label">About</div>
+        <div class="about-body" id="about-body"></div>
+      </div>
+
+      <details class="section" id="sec-experience" open>
+        <summary id="sum-experience">Experience (0)</summary>
+        <div class="section-body" id="body-experience"></div>
+      </details>
+      <details class="section" id="sec-education" open>
+        <summary id="sum-education">Education (0)</summary>
+        <div class="section-body" id="body-education"></div>
+      </details>
+      <details class="section" id="sec-skills">
+        <summary id="sum-skills">Skills (0)</summary>
+        <div class="section-body" id="body-skills"></div>
+      </details>
+      <details class="section" id="sec-certifications">
+        <summary id="sum-certifications">Certifications (0)</summary>
+        <div class="section-body" id="body-certifications"></div>
+      </details>
+      <details class="section" id="sec-languages">
+        <summary id="sum-languages">Languages (0)</summary>
+        <div class="section-body" id="body-languages"></div>
+      </details>
+
+      <details class="raw-debug" id="raw-section">
+        <summary>Raw JSON (debug)</summary>
+        <div class="raw-head">
+          <button type="button" class="copy" id="copy">Copy raw JSON</button>
+        </div>
+        <pre id="json-block"><code id="json"></code></pre>
+      </details>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById("form");
+    const input = document.getElementById("query");
+    const submit = document.getElementById("submit");
+    const statusEl = document.getElementById("status");
+    const resultSection = document.getElementById("result-section");
+    const rawSection = document.getElementById("raw-section");
+    const photoImg = document.getElementById("photo-img");
+    const photoPlaceholder = document.getElementById("photo-placeholder");
+    const jsonEl = document.getElementById("json");
+    const copyBtn = document.getElementById("copy");
+    const missingNote = document.getElementById("missing-note");
+    const profileName = document.getElementById("profile-name");
+    const profileHeadline = document.getElementById("profile-headline");
+    const profileLocation = document.getElementById("profile-location");
+    const aboutBody = document.getElementById("about-body");
+
+    let pollTimer = null;
+    let elapsedTimer = null;
+    let startedAt = 0;
+    let pollInFlight = false;
+
+    function setBusy(busy) {
+      submit.disabled = busy;
+      input.disabled = busy;
+    }
+
+    function showElapsed() {
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      showStatus(
+        '<span class="spinner" aria-hidden="true"></span> Fetching... (' + elapsed + "s)",
+        "busy"
+      );
+    }
+
+    function startElapsed() {
+      stopElapsed();
+      startedAt = Date.now();
+      showElapsed();
+      elapsedTimer = setInterval(showElapsed, 200);
+    }
+
+    function stopElapsed() {
+      if (elapsedTimer) {
+        clearInterval(elapsedTimer);
+        elapsedTimer = null;
+      }
+    }
+
+    function showStatus(html, className) {
+      statusEl.className = "status " + (className || "");
+      statusEl.innerHTML = html;
+    }
+
+    function textOrEmpty(value) {
+      if (value == null) {
+        return "";
+      }
+      const text = String(value).trim();
+      return text && text !== "null" ? text : "";
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) {
+        node.className = className;
+      }
+      if (text) {
+        node.textContent = text;
+      }
+      return node;
+    }
+
+    function showPhotoPlaceholder() {
+      photoImg.hidden = true;
+      photoImg.removeAttribute("src");
+      photoPlaceholder.hidden = false;
+    }
+
+    function renderPhoto(url) {
+      const complete = url && /^https?:\/\//.test(url)
+        && /(?:shrink|scale)_\d+_\d+/.test(url);
+      if (complete) {
+        photoPlaceholder.hidden = true;
+        photoImg.hidden = false;
+        photoImg.onerror = showPhotoPlaceholder;
+        photoImg.src = url;
+      } else {
+        showPhotoPlaceholder();
+      }
+    }
+
+    function renderAbout(about) {
+      aboutBody.replaceChildren();
+      const text = textOrEmpty(about);
+      if (!text) {
+        aboutBody.appendChild(el("p", "about-empty", "No about section"));
+        return;
+      }
+      text.split(/\n\s*\n/).forEach((part) => {
+        const para = part.replace(/\n/g, " ").trim();
+        if (para) {
+          aboutBody.appendChild(el("p", "", para));
+        }
+      });
+    }
+
+    function emptyLine(label) {
+      return el("p", "empty-list", "No " + label.toLowerCase());
+    }
+
+    function renderExperience(items) {
+      const body = document.getElementById("body-experience");
+      document.getElementById("sum-experience").textContent =
+        "Experience (" + items.length + ")";
+      body.replaceChildren();
+      if (!items.length) {
+        body.appendChild(emptyLine("experience"));
+        return;
+      }
+      items.forEach((item) => {
+        const card = el("div", "entry");
+        const title = textOrEmpty(item.title);
+        const company = textOrEmpty(item.company);
+        const dates = textOrEmpty(item.date_range);
+        const location = textOrEmpty(item.location);
+        const workplace = textOrEmpty(item.workplace_type);
+        if (title) {
+          card.appendChild(el("p", "entry-title", title));
+        }
+        if (company) {
+          card.appendChild(el("p", "entry-sub", company));
+        }
+        if (dates) {
+          card.appendChild(el("p", "entry-meta", dates));
+        }
+        const extra = [location, workplace].filter(Boolean).join(" · ");
+        if (extra) {
+          card.appendChild(el("p", "entry-meta", extra));
+        }
+        if (card.childNodes.length) {
+          body.appendChild(card);
+        }
+      });
+      if (!body.childNodes.length) {
+        body.appendChild(emptyLine("experience"));
+      }
+    }
+
+    function renderEducation(items) {
+      const body = document.getElementById("body-education");
+      document.getElementById("sum-education").textContent =
+        "Education (" + items.length + ")";
+      body.replaceChildren();
+      if (!items.length) {
+        body.appendChild(emptyLine("education"));
+        return;
+      }
+      items.forEach((item) => {
+        const card = el("div", "entry");
+        const school = textOrEmpty(item.school);
+        const degree = textOrEmpty(item.degree);
+        const field = textOrEmpty(item.field_of_study);
+        const dates = textOrEmpty(item.date_range);
+        if (school) {
+          card.appendChild(el("p", "entry-title", school));
+        }
+        const combined = [degree, field].filter(Boolean).join(", ");
+        if (combined) {
+          card.appendChild(el("p", "entry-sub", combined));
+        }
+        if (dates) {
+          card.appendChild(el("p", "entry-meta", dates));
+        }
+        if (card.childNodes.length) {
+          body.appendChild(card);
+        }
+      });
+    }
+
+    function renderSkills(items) {
+      const body = document.getElementById("body-skills");
+      const names = items.map((item) => textOrEmpty(item && item.name)).filter(Boolean);
+      document.getElementById("sum-skills").textContent = "Skills (" + names.length + ")";
+      body.replaceChildren();
+      if (!names.length) {
+        body.appendChild(emptyLine("skills"));
+        return;
+      }
+      const wrap = el("div", "chips");
+      names.forEach((name) => wrap.appendChild(el("span", "chip", name)));
+      body.appendChild(wrap);
+    }
+
+    function renderCerts(items) {
+      const body = document.getElementById("body-certifications");
+      document.getElementById("sum-certifications").textContent =
+        "Certifications (" + items.length + ")";
+      body.replaceChildren();
+      if (!items.length) {
+        body.appendChild(emptyLine("certifications"));
+        return;
+      }
+      items.forEach((item) => {
+        const card = el("div", "entry");
+        const name = textOrEmpty(item.name);
+        const issuer = textOrEmpty(item.issuer);
+        const issued = textOrEmpty(item.issue_date) || textOrEmpty(item.date_range);
+        if (name) {
+          card.appendChild(el("p", "entry-title", name));
+        }
+        if (issuer) {
+          card.appendChild(el("p", "entry-sub", "by " + issuer));
+        }
+        if (issued) {
+          card.appendChild(el("p", "entry-meta", issued));
+        }
+        if (card.childNodes.length) {
+          body.appendChild(card);
+        }
+      });
+    }
+
+    function renderLanguages(items) {
+      const body = document.getElementById("body-languages");
+      document.getElementById("sum-languages").textContent =
+        "Languages (" + items.length + ")";
+      body.replaceChildren();
+      if (!items.length) {
+        body.appendChild(emptyLine("languages"));
+        return;
+      }
+      items.forEach((item) => {
+        const name = textOrEmpty(item.name);
+        if (!name) {
+          return;
+        }
+        const proficiency = textOrEmpty(item.proficiency);
+        const line = proficiency ? name + " (" + proficiency + ")" : name;
+        body.appendChild(el("p", "lang-row", line));
+      });
+    }
+
+    function renderProfile(result) {
+      const profile = result || {};
+      profileName.textContent = textOrEmpty(profile.full_name) || "Unknown profile";
+      const headline = textOrEmpty(profile.headline);
+      profileHeadline.hidden = !headline;
+      profileHeadline.textContent = headline;
+      const location = textOrEmpty(profile.location);
+      profileLocation.hidden = !location;
+      profileLocation.textContent = location ? "📍 " + location : "";
+      renderPhoto(profile.photo_url);
+      renderAbout(profile.about);
+      renderExperience(Array.isArray(profile.experience) ? profile.experience : []);
+      renderEducation(Array.isArray(profile.education) ? profile.education : []);
+      renderSkills(Array.isArray(profile.skills) ? profile.skills : []);
+      renderCerts(Array.isArray(profile.certifications) ? profile.certifications : []);
+      renderLanguages(Array.isArray(profile.languages) ? profile.languages : []);
+    }
+
+    function showJson(obj) {
+      jsonEl.textContent = JSON.stringify(obj, null, 2);
+      resultSection.hidden = false;
+      rawSection.open = false;
+      const result = obj && obj.result;
+      const missing = (result && result.missing_fields) || [];
+      if (Array.isArray(missing) && missing.length) {
+        missingNote.hidden = false;
+        missingNote.textContent =
+          "Some fields were unavailable for this profile: " + missing.join(", ");
+      } else {
+        missingNote.hidden = true;
+        missingNote.textContent = "";
+      }
+      if (result) {
+        renderProfile(result);
+      } else {
+        renderProfile({});
+      }
+    }
+
+    function clearPoll() {
+      stopElapsed();
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    copyBtn.addEventListener("click", async () => {
+      const text = jsonEl.textContent || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = "Copied";
+        setTimeout(() => { copyBtn.textContent = "Copy raw JSON"; }, 1200);
+      } catch (err) {
+        copyBtn.textContent = "Copy failed";
+        setTimeout(() => { copyBtn.textContent = "Copy raw JSON"; }, 1200);
+      }
+    });
+
+    async function pollJob(jobId) {
+      if (pollInFlight) {
+        return;
+      }
+      pollInFlight = true;
+      try {
+        const res = await fetch("/jobs/" + encodeURIComponent(jobId));
+        const body = await res.json();
+        if (body.status === "done") {
+          clearPoll();
+          setBusy(false);
+          const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+          showStatus("Success (" + elapsed + "s)", "ok");
+          showJson(body);
+          return;
+        }
+        if (body.status === "failed") {
+          clearPoll();
+          setBusy(false);
+          const code = (body.error && (body.error.code || body.error.status)) || res.status;
+          showStatus("Failed — " + code, "fail");
+          showJson(body);
+        }
+      } finally {
+        pollInFlight = false;
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const value = input.value.trim();
+      if (!value) {
+        input.focus();
+        return;
+      }
+      clearPoll();
+      setBusy(true);
+      startElapsed();
+      resultSection.hidden = true;
+      jsonEl.textContent = "";
+      showPhotoPlaceholder();
+
+      try {
+        const created = await fetch("/profiles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ linkedin_url_or_id: value }),
+        });
+        const createdBody = await created.json();
+        if (!created.ok) {
+          clearPoll();
+          setBusy(false);
+          const code = (createdBody.detail && createdBody.detail.code) || created.status;
+          showStatus("Failed — " + code, "fail");
+          showJson(createdBody);
+          return;
+        }
+        const jobId = createdBody.job_id;
+        pollTimer = setInterval(() => {
+          pollJob(jobId).catch((err) => {
+            clearPoll();
+            setBusy(false);
+            showStatus("Failed — network", "fail");
+            showJson({ code: "network_error", detail: String(err) });
+          });
+        }, 1500);
+        pollJob(jobId).catch((err) => {
+          clearPoll();
+          setBusy(false);
+          showStatus("Failed — network", "fail");
+          showJson({ code: "network_error", detail: String(err) });
+        });
+      } catch (err) {
+        clearPoll();
+        setBusy(false);
+        showStatus("Failed — network", "fail");
+        showJson({ code: "network_error", detail: String(err) });
+      }
+    });
+  </script>
+</body>
+</html>
